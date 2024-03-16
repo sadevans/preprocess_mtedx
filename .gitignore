@@ -168,3 +168,5 @@ metadata/
 preparation/tools/face_alignment
 preparation/tools/face_detection
 test.py
+new_requirements.txt
+test.txt

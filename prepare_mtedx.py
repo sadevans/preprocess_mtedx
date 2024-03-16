@@ -12,8 +12,7 @@ import ffmpeg
 import tarfile
 from os import path
 import wget
-from urllib.error import HTTPError
-from functools import partial
+
 
 # SPLITS = ['train', 'test', 'valid']
 SPLITS = ['valid']

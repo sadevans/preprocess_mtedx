@@ -1,12 +1,8 @@
 import argparse
-import glob
 import math
 import os
 import pickle
-import shutil
 import warnings
-
-import ffmpeg
 from data.data_module import AVSRDataLoader
 from tqdm import tqdm
 from transforms import TextTransform

@@ -1,8 +1,6 @@
 import argparse
 from pathlib import Path
-# import sox
 import wget
-import yt_dlp
 import warnings
 import ffmpeg
 import os
