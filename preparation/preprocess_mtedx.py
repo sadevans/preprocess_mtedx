@@ -10,7 +10,7 @@ import ffmpeg
 from data.data_module import AVSRDataLoader
 from tqdm import tqdm
 from transforms import TextTransform
-from utils import save_vid_aud_txt, split_file, save_vid_txt
+from download import save_vid_aud_txt, split_file, save_vid_txt
 
 warnings.filterwarnings("ignore")
 
