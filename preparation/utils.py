@@ -19,6 +19,7 @@ def split_file(filename, max_frames=600, fps=25.0):
     threshold = max_frames / fps
 
     for line in lines:
+        print(line)
         if "WORD START END ASDSCORE" in line:
             flag = 1
             continue
@@ -108,7 +109,7 @@ def save_vid_txt(
    
     # -- save text
     os.makedirs(os.path.dirname(dst_txt_filename), exist_ok=True)
-    f = open(dst_txt_filename, "w")
+    f = open(dst_txt_filename, "w", encoding='utf-8')
     f.write(f"{content}")
     f.close()
 
