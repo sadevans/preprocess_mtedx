@@ -6,7 +6,7 @@ import warnings
 from data.data_module import AVSRDataLoader
 from tqdm import tqdm
 from transforms import TextTransform
-from download import save_vid_aud_txt, split_file, save_vid_txt
+from utils import save_vid_aud_txt, split_file, save_vid_txt
 
 warnings.filterwarnings("ignore")
 
@@ -99,7 +99,6 @@ label_filename = os.path.join(
 
 print('LABEL FILENAME: ', label_filename)
 
-
 os.makedirs(os.path.dirname(label_filename), exist_ok=True)
 print(f"Directory {os.path.dirname(label_filename)} created")
 
@@ -119,40 +118,16 @@ os.makedirs(dst_txt_dir, exist_ok=True)
 print('DST VID DIR: ', dst_vid_dir)
 print('DST TXT DIR: ', dst_txt_dir)
 
-
-# if dataset == "lrs3":
-#     if args.subset == "test":
-#         filenames = glob.glob(
-#             os.path.join(args.data_dir, args.subset, "**", "*.mp4"), recursive=True
-#         )
-#     elif args.subset == "train":
-#         filenames = glob.glob(
-#             os.path.join(args.data_dir, "trainval", "**", "*.mp4"), recursive=True
-#         )
-#         filenames.extend(
-#             glob.glob(
-#                 os.path.join(args.data_dir, "pretrain", "**", "*.mp4"), recursive=True
-#             )
-#         )
-#         filenames.sort()
-#     else:
-#         raise NotImplementedError
-
 print('COMMON FILE: ', os.path.join(args.data_dir, args.subset, args.subset))
-# print(os.path.join(args.data_dir, "main", _.split()[0] + ".mp4"))
-# lines = open(os.path.join(os.path.dirname(args.data_dir), args.subset, args.subset) + ".txt").readlines()
-# print(lines)
-# for _ in open(os.path.join(os.path.dirname(args.data_dir), args.subset, args.subset) + ".txt"):
-#     print(_.strip())
-#     print(os.path.join(args.data_dir, "main", _.split()[0] + ".mp4"))
-# videos  = os.listdir(os.path.join(args.data_dir, "video"))
-# print('VIDEOS: ', videos)
 
 if dataset.split('_')[0] == "mtedx":
     if args.subset in ["valid", "test"]:
         videos  = os.listdir(os.path.join(args.data_dir, args.subset, "video"))
 
         for vid in videos:
+          if vid == '.ipynb_checkpoints':
+            continue
+          else:
             filenames = [
                 os.path.join(args.data_dir, args.subset, "video", vid, _.split()[0] + ".mp4")
                 for _ in open(
@@ -163,23 +138,19 @@ if dataset.split('_')[0] == "mtedx":
             ]
     elif args.subset == "train":
         videos  = os.listdir(os.path.join(args.data_dir, args.subset, "video"))
-
+        
         for vid in videos:
-            filenames = [
-                os.path.join(args.data_dir, args.subset, "video", vid, _.split()[0] + ".mp4")
-                for _ in open(
-                    os.path.join(args.data_dir, args.subset) + ".txt"
-                )
-                .read()
-                .splitlines()
-            ]
-        # pretrain_filenames = [
-        #     os.path.join(args.data_dir, "pretrain", _.split()[0] + ".mp4")
-        #     for _ in open(os.path.join(os.path.dirname(args.data_dir), "pretrain.txt"))
-        #     .read()
-        #     .splitlines()
-        # ]
-        # filenames.extend(pretrain_filenames)
+            if vid == '.ipynb_checkpoints':
+                continue
+            else:
+                filenames = [
+                    os.path.join(args.data_dir, args.subset, "video", vid, _.split()[0] + ".mp4")
+                    for _ in open(
+                        os.path.join(args.data_dir, args.subset) + ".txt"
+                    )
+                    .read()
+                    .splitlines()
+                ]
         filenames.sort()
     else:
         raise NotImplementedError
@@ -205,40 +176,35 @@ for data_filename in tqdm(filenames):
     except (UnboundLocalError, TypeError, OverflowError, AssertionError):
         continue
 
-    if os.path.normpath(data_filename).split(os.sep)[-3] in [
+    print(os.path.normpath(data_filename).split(os.sep)[-3])
+    print(os.path.normpath(data_filename))
+    if os.path.normpath(data_filename).split(os.sep)[-4] in [
         "trainv",
         "test",
         "valid",
     ]:
-        dst_vid_filename = (
-            f"{data_filename.replace(args.data_dir, dst_vid_dir)[:-4]}.mp4"
-        )
-        # dst_aud_filename = (
-        #     f"{data_filename.replace(args.data_dir, dst_vid_dir)[:-4]}.wav"
-        # )
-        dst_txt_filename = (
-            f"{data_filename.replace(args.data_dir, dst_txt_dir)[:-4]}.txt"
-        )
+        print('DST VID DIR: ', dst_vid_dir)
+        print(data_filename.split('/'))
+        print(args.data_dir)
+        dst_vid_filename = os.path.join(dst_vid_dir, f"{data_filename.split('/')[-1]}")
+
+        dst_txt_filename = os.path.join(dst_txt_dir, f"{data_filename.split('/')[-1].replace('mp4', 'txt')}")
+        
         trim_vid_data = video_data
+        txt_data_filename = data_filename[:-4].replace('video', 'txt')
         text_line_list = (
-            open(data_filename[:-4] + ".txt", "r").read().splitlines()[0].split(" ")
+            open(txt_data_filename + ".txt", "r", encoding="utf-8").read().splitlines()[0].split(" ")
         )
         text_line = " ".join(text_line_list[2:])
-        content = text_line.replace("}", "").replace("{", "")
-
-        # # if trim_vid_data is None or trim_aud_data is None:
+        content = text_line.replace("}", "").replace("{", "").replace(",", "").replace(".", "")
+        print('CONTENT: ', content)
         if trim_vid_data is None:
-
-            continue
+          continue
         video_length = len(trim_vid_data)
-        # audio_length = trim_aud_data.size(1)
-        # # if video_length == 0 or audio_length == 0:
         if video_length == 0:
 
             continue
-        # if audio_length/video_length < 560. or audio_length/video_length > 720. or video_length < 12:
-        #    continue
-        # # save_vid_aud_txt(
+        print('SAVING...')
         save_vid_txt( 
             dst_vid_filename,
             # dst_aud_filename,
@@ -248,22 +214,6 @@ for data_filename in tqdm(filenames):
             content,
             video_fps=25
         )
-
-        # if args.combine_av:
-        #     in1 = ffmpeg.input(dst_vid_filename)
-        #     in2 = ffmpeg.input(dst_aud_filename)
-        #     out = ffmpeg.output(
-        #         in1["v"],
-        #         in2["a"],
-        #         dst_vid_filename[:-4] + ".av.mp4",
-        #         vcodec="copy",
-        #         acodec="aac",
-        #         strict="experimental",
-        #         loglevel="panic",
-        #     )
-        #     out.run()
-        #     shutil.move(dst_vid_filename[:-4] + ".av.mp4", dst_vid_filename)
-
         basename = os.path.relpath(
             dst_vid_filename, start=os.path.join(args.root_dir, dataset)
         )
@@ -288,62 +238,27 @@ for data_filename in tqdm(filenames):
             content, start, end, duration = splitted[i]
             start_idx, end_idx = int(start * 25), int(end * 25)
             try:
-                trim_vid_data, trim_aud_data = (
+                trim_vid_data = (
                     video_data[start_idx:end_idx],
                 )
             except TypeError:
                 continue
-        dst_vid_filename = (
-            f"{data_filename.replace(args.data_dir, dst_vid_dir)[:-4]}_{i:02d}.mp4"
-        )
-        # # dst_aud_filename = (
-        # #     f"{data_filename.replace(args.data_dir, dst_vid_dir)[:-4]}_{i:02d}.wav"
-        # # )
-        dst_txt_filename = (
-            f"{data_filename.replace(args.data_dir, dst_txt_dir)[:-4]}_{i:02d}.txt"
-        )
+        dst_vid_filename = os.path.join(dst_vid_dir, f"{data_filename.split('/')[-1]}")
 
-        if trim_vid_data is None or trim_aud_data is None:
+        dst_txt_filename = os.path.join(dst_txt_dir, f"{data_filename.split('/')[-1].replace('mp4', 'txt')}")
+
+        if trim_vid_data is None:
             continue
         video_length = len(trim_vid_data)
-        audio_length = trim_aud_data.size(1)
-        if video_length == 0 or audio_length == 0:
+        if video_length == 0:
             continue
-        # save_vid_aud_txt(
-        #     dst_vid_filename,
-        #     dst_aud_filename,
-        #     dst_txt_filename,
-        #     trim_vid_data,
-        #     trim_aud_data,
-        #     content,
-        #     video_fps=25,
-        #     audio_sample_rate=16000,
-        # )
         save_vid_txt(
             dst_vid_filename,
             dst_txt_filename,
             trim_vid_data,
             content,
             video_fps=25,
-            # audio_sample_rate=16000,
         )
-
-        # if args.combine_av:
-        #     in1 = ffmpeg.input(dst_vid_filename)
-        #     # # in2 = ffmpeg.input(dst_aud_filename)
-        #     out = ffmpeg.output(
-        #         in1["v"],
-        #         # in2["a"],
-        #         dst_vid_filename[:-4] + ".av.mp4",
-        #         vcodec="copy",
-        #         acodec="aac",
-        #         strict="experimental",
-        #         loglevel="panic",
-        #     )
-        #     out.run()
-        #     # os.remove(dst_aud_filename)
-        #     shutil.move(dst_vid_filename[:-4] + ".av.mp4", dst_vid_filename)
-
         basename = os.path.relpath(
             dst_vid_filename, start=os.path.join(args.root_dir, dataset)
         )
