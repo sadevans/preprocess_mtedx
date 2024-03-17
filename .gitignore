@@ -163,7 +163,6 @@ test_preprocessed/
 test_dir_mtedx/
 mtedx/
 mTedx/
-data/
 metadata/
 preparation/tools/face_alignment
 preparation/tools/face_detection
