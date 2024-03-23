@@ -12,6 +12,8 @@ import ffmpeg
 import tarfile
 from os import path
 import wget
+import bisect
+import re
 
 
 # SPLITS = ['train', 'test', 'valid']
@@ -190,42 +192,41 @@ def make_transcription_segments(mtedx_path, src_lang):
         read_transcript_file = read_txt_file(transcript_file)
         read_segment_file = read_txt_file(segment_file)
         i = 0
-        # with open(txt_path / 'segments_transcriptions.txt', "w") as file:
-        #     for line_segm, line_transcript in zip(read_segment_file, read_transcript_file):
-        #         # print(' '.join(line_transcript.strip().split()[4:]))
-        #         split_ = line_transcript.strip().split()
-        #         seg_id, fid, start_sec, end_sec = line_segm.strip().split()
-        #         seg_id_tr, fid_tr, start_sec_tr, end_sec_tr, text = split_[0], split_[1], split_[2], split_[3], ' '.join(split_[4:])
-        #         if fid == fid_tr and (int(float(start_sec)) == int(float(start_sec_tr))) and (int(float(end_sec)) == int(float(end_sec_tr))):
-        #             file.write(f"{seg_id} {fid} {start_sec} {end_sec} {text}\n")
+        # Открываем файлы для чтения
+        file = open(txt_path / 'segments_trans.txt', "w")
+        with open(segment_file, 'r') as segments_file, open(transcript_file, 'r') as transcriptions_file:
+            segments_lines = segments_file.readlines()
+            transcriptions_lines = transcriptions_file.readlines()
 
-        #         elif fid == fid_tr and (int(float(start_sec)) == int(float(start_sec_tr))) and (int(float(end_sec)) != int(float(end_sec_tr))):
-        #             file.write(f"{seg_id} {fid} {start_sec} {end_sec_tr} {text}\n")
-        #         else:
-        #             continue
-        with open(txt_path / 'segments_transcriptions.txt', "w") as file:
-            with open(segment_file, 'r') as file_seg, open(transcript_file, 'r') as file_tr:
-                for line_seg in file_seg:
-                    line_tr = file_tr.readline()
-                    seg_id, fid, start_sec, end_sec = line_seg.strip().split()
-                    split_ = line_tr.strip().split()
-                    if len(split_) > 0:
-                        seg_id_tr, fid_tr, start_sec_tr, end_sec_tr, text = split_[0], split_[1], split_[2], split_[3], ' '.join(split_[4:])
+            transcriptions_intervals = []
+            for line in transcriptions_lines:
+                parts = line.strip().split()
+                start = int(float(parts[2]))
+                end = int(float(parts[3]))
+                transcriptions_intervals.append((start, end, line))
 
-                        # line_tr = next(file_tr, line_tr)
-                        # split_ = line_tr.strip().split()
-                        # print(split_)
-                        if len(split_) > 0:
-                            
-                            seg_id_tr, fid_tr, start_sec_tr, end_sec_tr, text = split_[0], split_[1], split_[2], split_[3], ' '.join(split_[4:])
-                            
-                            if fid == fid_tr and int(float(start_sec)) == int(float(start_sec_tr)) and (int(float(end_sec)) == int(float(end_sec_tr))):
-                                file.write(f"{seg_id} {fid} {start_sec} {end_sec} {text}\n")
-                            elif fid == fid_tr and (int(float(start_sec)) == int(float(start_sec_tr))) and (int(float(end_sec)) != int(float(end_sec_tr))):
-                                file.write(f"{seg_id_tr} {fid} {start_sec} {end_sec_tr} {text}\n")
-                            else:
-                                continue
+            transcriptions_intervals.sort(key=lambda x: x[0])
 
+            for line in segments_lines:
+                parts = line.strip().split()
+                segment_id = parts[0]
+                start = int(float(parts[2]))
+                end = int(float(parts[3]))
+
+                i = bisect.bisect_left(transcriptions_intervals, (start, start))
+
+                matched_text = None
+                while i < len(transcriptions_intervals):
+                    interval_start, interval_end, interval_text = transcriptions_intervals[i]
+                    if interval_start <= end and interval_end >= start:
+                        matched_text = interval_text
+                        break
+                    i += 1
+
+                print(f"{line.strip()} - {matched_text.strip() if matched_text else 'Текст не найден'}")
+                if matched_text:
+                    file.write(f"{line.strip().split()[0]} {line.strip().split()[1]} {line.strip().split()[2]} {line.strip().split()[3]} {' '.join(matched_text.strip().split()[4:])}\n")
+                    
 
 def preprocess_video(mtedx_path, src_lang, dir_out):
     """
@@ -263,7 +264,7 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
             )
 
         segment_file = (
-            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments_transcriptions.txt"
+            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments_trans.txt"
         )
         video_to_segments = defaultdict(list)
 
@@ -353,6 +354,37 @@ def extract_tgz(tgz_filepath, extract_path, out_filename=None):
     tgz_object.close()
 
 
+def prepare_txt(mtedx_path, src_lang):
+    corpus_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / f"input_{src_lang}.txt"
+    # corpus_path = f"input_{src_lang}.txt"
+
+    corpus_file = open(corpus_path, "w")
+
+    for split in SPLITS:
+        split_dir_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split
+        txt_path = split_dir_path / "txt"
+        split_corpus_file = open(txt_path / f"{split}.{src_lang}")
+        lines = split_corpus_file.readlines()
+
+        for i, line in enumerate(lines):
+            line = re.sub(r"[A-Za-z]+", "", line)
+            line = re.sub(r"\([^)]*\)\ *", "", line)
+            line = re.sub(r'^[^:]+:\s*', '', line)
+
+            if len(line) == 0:
+                continue
+            line = line.upper().translate(str.maketrans('', '', string.punctuation))
+            line = re.sub(r"»|«|—", "", line)
+            # line = replace_numbers_with_words(line)
+            line = re.sub(r'[^0-9а-яА-Я \n]', '', line)
+
+            if line.strip() != "" and line.strip() != " ":
+                corpus_file.write(line)
+                print(line)
+            
+    corpus_file.close()
+
+
 if __name__ == '__main__':
     # Argument Parsing
     parser = argparse.ArgumentParser(description="mTEDx Preprocessing")
@@ -418,4 +450,4 @@ if __name__ == '__main__':
     preprocess_vtt_files(Path(downloaded_path), src_lang, seg_duration)
     make_transcription_segments(Path(downloaded_path), src_lang)
     preprocess_video(Path(downloaded_path), src_lang, Path(dst_vid_dir))
-# 
+    prepare_txt(Path(downloaded_path), src_lang)
