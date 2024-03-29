@@ -16,7 +16,7 @@ from tqdm.contrib.concurrent import process_map
 
 
 # SPLITS = ['train', 'test', 'valid']
-SPLITS = ['valid']
+SPLITS = ['test', 'valid']
 
 
 
@@ -98,7 +98,7 @@ def get_video_duration(video_filepath: str) -> float:
 
 def download_file(url, download_path): # починить, подредачить типы переменных и возврат
     filename = url.rpartition("/")[-1]
-    if not path.exists(download_path + '/' + filename):
+    if not path.exists(download_path / filename):
         try:
             # download file
             print(f"Downloading {filename} from {url}")
@@ -134,20 +134,22 @@ def download_mtedx_videos(args):
         not_found_videos = set()
     
     for split in SPLITS:
-        print(args['dataset'])
-        download_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "video" / split
+        # download_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "video" / split
+        download_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "video"
+
         download_path.mkdir(parents=True, exist_ok=True)
 
         if is_empty(download_path): #TODO: better check
             if split == "train":
                 print(f"\nDownloading {args['src_lang']} videos from YouTube")
         
-            wav_dir_path = (
-                args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
-            )
+            wav_dir_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
+            
             yt_ids = [wav_filepath.stem for wav_filepath in wav_dir_path.glob("*")]
             # wav_files_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
             # print(download_path)
+            # if split == 'train':
+            #     yt_ids = yt_ids[:int(len(yt_ids)/6)]
             downloading_status = process_map(
                 partial(download_video_from_youtube, download_path),
                 yt_ids,
@@ -195,7 +197,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--download",
-        default=False,
+        default=True,
         # required=True,
         type=int,
         choices=[1, 0],
