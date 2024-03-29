@@ -19,15 +19,15 @@ NOISE_FILENAME = os.path.join(
 SP_MODEL_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "spm",
-    "unigram",
-    "unigram5000.model",
+    "unigram_ru",
+    "unigram20000.model",
 )
 
 DICT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "spm",
-    "unigram",
-    "unigram5000_units.txt",
+    "unigram_ru",
+    "unigram20000_units.txt",
 )
 
 
