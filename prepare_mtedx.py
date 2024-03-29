@@ -14,10 +14,13 @@ from os import path
 import wget
 import bisect
 import re
+import string
 
 
 # SPLITS = ['train', 'test', 'valid']
-SPLITS = ['valid']
+SPLITS = ['test', 'valid']
+# SPLITS = ['valid']
+
 
 
 def time_to_seconds(time_str):
@@ -142,8 +145,16 @@ def preprocess_vtt(vtt_file_path: Path, duration_threshold: int) -> list:
                             max_duration = end_time - start_time
                     else:
                         # current_line['text'] += line.strip() + ' '
-                        current_line_['text'] += line.strip() + ' '
+                        # current_line_['text'] += line.strip() + ' '
+                        # end_line = 
+                        end_line = False
                         if line.strip()[-1] in ['.', '?', '!']:
+                            end_line = True
+                        line = re.sub(r'[Ё]', 'Е', line)
+                        line = re.sub(r'[ё]', 'е', line)
+                        line = re.sub(r'[^0-9а-яА-Я \n]', '', line)
+                        current_line_['text'] += line.upper().strip() + ' '
+                        if end_line:
                             # extracted_lines.append(current_line['text'].strip())
                             # if len(current_line['time']) == 2: 
                             if current_line_['start'] is not None and current_line_['end'] is not None:
@@ -180,7 +191,7 @@ def make_transcription_segments(mtedx_path, src_lang):
         # transcript_txt = txt_path / "transcriptions.txt"
 
         segment_file = (
-            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments.txt"
+            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments"
         )
 
         transcript_file = (
@@ -223,7 +234,7 @@ def make_transcription_segments(mtedx_path, src_lang):
                         break
                     i += 1
 
-                print(f"{line.strip()} - {matched_text.strip() if matched_text else 'Текст не найден'}")
+                # print(f"{line.strip()} - {matched_text.strip() if matched_text else 'Текст не найден'}")
                 if matched_text:
                     file.write(f"{line.strip().split()[0]} {line.strip().split()[1]} {line.strip().split()[2]} {line.strip().split()[3]} {' '.join(matched_text.strip().split()[4:])}\n")
                     
@@ -239,7 +250,7 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
     for split in SPLITS:
         # print(split)
         split_dir_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split
-        video_segments = list(read_txt_file(split_dir_path / "txt" / "segments.txt"))
+        video_segments = list(read_txt_file(split_dir_path / "txt" / "segments"))
         # out_path = dir_out / src_lang / split / "video"
         out_path = dir_out / split / "video"
 
@@ -321,15 +332,17 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
             for i, item in enumerate(video_segments):
                 start = str(datetime.timedelta(seconds=float(item['start'])))
                 end = str(datetime.timedelta(seconds=float(item['end'])))
-                txt_content = item['text']
+                txt_content = item['text'].upper().translate(str.maketrans('', '', string.punctuation))
                 file_out = out_seg_path / f"{item['id']}.{video_format}"
+                print(f"SEGMENTING {item['id']}")
                 (
                     ffmpeg
                     .input(str(in_filepath), ss=start, to=end)
                     .output(str(file_out))
-                    .run(quiet=True)
+                    .run(quiet=False)
                 )
                 with open(f"{out_seg_txt_path / item['id']}.txt", "w") as file:
+                    print(f"WRITING TRANSCRIPTION IN {item['id']}")
                     file.write(f"{item['start']} {item['end']} {txt_content}")
 
                 if i != len(video_segments) - 1: common_file.write(f"{item['id']} {item['start']} {item['end']} {txt_content}\n")
@@ -376,11 +389,13 @@ def prepare_txt(mtedx_path, src_lang):
             line = line.upper().translate(str.maketrans('', '', string.punctuation))
             line = re.sub(r"»|«|—", "", line)
             # line = replace_numbers_with_words(line)
+            line = re.sub(r'Ё', 'Е', line)
+            line = re.sub(r'ё', 'е', line)
             line = re.sub(r'[^0-9а-яА-Я \n]', '', line)
 
             if line.strip() != "" and line.strip() != " ":
                 corpus_file.write(line)
-                print(line)
+                # print(line)
             
     corpus_file.close()
 
