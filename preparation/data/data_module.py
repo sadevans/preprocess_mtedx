@@ -36,11 +36,14 @@ class AVSRDataLoader:
         if self.modality == "video":
             video = self.load_video(data_filename)
             if not landmarks:
+                print("=======PROCESSING VIDEO=======")
                 landmarks = self.landmarks_detector(video)
+            
             video = self.video_process(video, landmarks)
             if video is None:
                 raise TypeError("video cannot be None")
             video = torch.tensor(video)
+            torch.cuda.empty_cache()
             return video
 
     def load_audio(self, data_filename):
