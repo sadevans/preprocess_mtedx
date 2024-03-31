@@ -15,9 +15,9 @@ from functools import partial
 from tqdm.contrib.concurrent import process_map
 
 
-SPLITS = ['train', 'test', 'valid']
+# SPLITS = ['train', 'test', 'valid']
 # SPLITS = ['test', 'valid']
-
+SPLITS = ['train']
 
 
 def download_extract_file_if_not(url, tgz_filepath, download_filename):
@@ -72,7 +72,7 @@ def download_video_from_youtube(download_path: str, yt_id: str, only_video: bool
     else:
         url = f"https://www.youtube.com/watch?v={yt_id}"
         yt = YouTube(url)
-        video = yt.streams.filter(only_video=only_video).first()
+        video = yt.streams.filter(only_video=only_video, res="1080p").first()
         video.download(output_path=download_path, filename=yt_id + '.mp4')
         downloaded = True
     return downloaded
@@ -148,9 +148,9 @@ def download_mtedx_videos(args):
             yt_ids = [wav_filepath.stem for wav_filepath in wav_dir_path.glob("*")]
             downloading_status = process_map(
                 partial(download_video_from_youtube, download_path),
-                yt_ids,
+                yt_ids[0:1],
                 max_workers=os.cpu_count(),
-                desc=f"======Downloading {args['src_lang']}/{split} Videos======",
+                desc=f"\n======Downloading {args['src_lang']}/{split} Videos======\n",
                 chunksize=1,
             )
             assert len(yt_ids) == len(downloading_status)
