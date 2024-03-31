@@ -8,12 +8,12 @@ import warnings
 
 from ibug.face_alignment import FANPredictor
 from ibug.face_detection import RetinaFacePredictor
-
+import torch
 warnings.filterwarnings("ignore")
 
 
 class LandmarksDetector:
-    def __init__(self, device="cuda:0", model_name="resnet50"):
+    def __init__(self, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), model_name="resnet50"):
         self.face_detector = RetinaFacePredictor(
             device=device,
             threshold=0.8,

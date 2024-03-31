@@ -159,6 +159,7 @@ class VideoProcess:
         stable_reference = self.get_stable_reference(
             reference, reference_size, target_size
         )
+        # stable_reference = reference
         transform = self.estimate_affine_transform(
             landmarks, stable_points, stable_reference
         )

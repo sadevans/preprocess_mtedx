@@ -43,6 +43,7 @@ def split_file(filename, max_frames=600, fps=25.0):
                 stack = [word]
     if stack:
         res.append([" ".join(stack), start_timestamp, end, end - start_timestamp])
+        print('RES IN SPLITTING: ', res)
     return res
 
 
