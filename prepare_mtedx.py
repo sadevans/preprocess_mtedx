@@ -21,8 +21,6 @@ import string
 SPLITS = ['test', 'valid']
 # SPLITS = ['valid']
 
-
-
 def time_to_seconds(time_str):
     """
         Convert time in format %H:%M:%S.%f to %S.f
@@ -39,6 +37,19 @@ def time_to_seconds(time_str):
     return total_seconds
 
 
+def preprocess_line(line):
+    line = line.upper()
+    line = re.sub(r'^[^:]+:\s*', '', line)
+    line = re.sub(r'\([^)]*\)', '', line)
+    line = line.replace('Ё', 'Е')
+    line = line.replace('ё', 'е')
+    line = re.sub(r'[^0-9а-яА-Я- ]', '', line)
+    line = line.replace('\t', '')
+    line = re.sub(r'\s{2,}', ' ', line)
+
+    return line
+
+
 def read_txt_file(txt_filepath:Path):
     """
         Read text files
@@ -51,14 +62,14 @@ def read_txt_file(txt_filepath:Path):
         return (line.strip() for line in fin.readlines())
 
 
-def download_mtedx_data(download_path, src, tgt):
-    """Downloads mTEDx data from OpenSLR"""
-    tgz_filename = f"mtedx_{src}-{tgt}.tgz" if src != tgt else f"mtedx_{src}.tgz"
-    download_extract_file_if_not(
-        url=f"https://www.openslr.org/resources/100/{tgz_filename}",
-        tgz_filepath=download_path / tgz_filename,
-        download_filename=f"{src}-{tgt}"
-    )
+# def download_mtedx_data(download_path, src, tgt):
+#     """Downloads mTEDx data from OpenSLR"""
+#     tgz_filename = f"mtedx_{src}-{tgt}.tgz" if src != tgt else f"mtedx_{src}.tgz"
+#     download_extract_file_if_not(
+#         url=f"https://www.openslr.org/resources/100/{tgz_filename}",
+#         tgz_filepath=download_path / tgz_filename,
+#         download_filename=f"{src}-{tgt}"
+#     )
 
 
 
@@ -69,8 +80,6 @@ def preprocess_vtt_files(mtedx_path: Path, src_lang: str, duration_threshold: in
             - mtedx_path - the path to mtedx dataset
             - src_lang - source language
             - duration_threshold - maximum length of a video segment in seconds
-        Return:
-            None
     """
     for split in SPLITS:
         split_dir_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split
@@ -85,17 +94,11 @@ def preprocess_vtt_files(mtedx_path: Path, src_lang: str, duration_threshold: in
         video_transcriptions = OrderedDict(
             sorted(video_transcriptions.items(), key=lambda x: len(x[1]))
         )
-        with open(transcriptions_path / "transcriptions.txt", "w") as transcriptions:
+        with open(transcriptions_path / "transcriptions", "w") as transcriptions:
            for key, value in video_transcriptions.items():
-            #    print('LEN:', len(value))
                i = 0
                for item in value:
-                    if i != len(value) - 1:
-                        transcriptions.write(f"{item['id']} {key} {item['start']} {item['end']} {item['text']}\n")
-                    else:
-                        transcriptions.write(f"{item['id']} {key} {item['start']} {item['end']} {item['text']}")
-                    i += 1
-
+                    transcriptions.write("{}\n".format(f"{item['id']} {key} {item['start']} {item['end']} {item['text']}"))
 
 
 def preprocess_vtt(vtt_file_path: Path, duration_threshold: int) -> list:
@@ -110,17 +113,11 @@ def preprocess_vtt(vtt_file_path: Path, duration_threshold: int) -> list:
     """
     
     with open(vtt_file_path, 'r') as file:
-        # print(vtt_file_path)
 
         video_name = str(vtt_file_path).split('/')[-1].split('.')[0]
-        # print(video_name)
         lines = file.readlines()
-        # extracted_lines = []
         extracted_lines_ = []
-        # current_line = {'time': [], 'text': ''}
         current_line_ = {'id': '', 'start': None, 'end': None, 'text': ''}
-        # print('CURRENT LINE LEN', len(current_line_['id']))
-
         max_duration = 0
         flag_start = 0
 
@@ -128,7 +125,7 @@ def preprocess_vtt(vtt_file_path: Path, duration_threshold: int) -> list:
             # if 
             i = len(extracted_lines_)
             if not any(char in line for char in '()[]'):
-                if line.strip():  # проверка на пустую строку
+                if line.strip():
                     if '-->' in line:
                         if flag_start == 0: 
                             start_time = time_to_seconds(line.split('-->')[0].replace(' ', ''))
@@ -139,72 +136,41 @@ def preprocess_vtt(vtt_file_path: Path, duration_threshold: int) -> list:
                             current_line_['id'] = f'{video_name}_{i:04}'
                             current_line_['start'] = start_time
                             current_line_['end'] = end_time
-
-                            # current_line['time'] = [start_time, end_time]
                         if end_time - start_time > max_duration:
                             max_duration = end_time - start_time
                     else:
-                        # current_line['text'] += line.strip() + ' '
-                        # current_line_['text'] += line.strip() + ' '
-                        # end_line = 
                         end_line = False
                         if line.strip()[-1] in ['.', '?', '!']:
                             end_line = True
-                        line = re.sub(r'[Ё]', 'Е', line)
-                        line = re.sub(r'[ё]', 'е', line)
-                        line = re.sub(r'[^0-9а-яА-Я \n]', '', line)
+                        line = preprocess_line(line)
+                        if len(line) == 0:
+                            continue
                         current_line_['text'] += line.upper().strip() + ' '
                         if end_line:
-                            # extracted_lines.append(current_line['text'].strip())
-                            # if len(current_line['time']) == 2: 
                             if current_line_['start'] is not None and current_line_['end'] is not None:
-                            
-                                # extracted_lines.append(current_line)
                                 extracted_lines_.append(current_line_)
-
-                            # current_line = {'time': [], 'text': ''}
                             current_line_ = {'id': '', 'start': None, 'end': None, 'text': ''}
                             flag_start = 0
-
     return extracted_lines_
 
 
 
 def make_transcription_segments(mtedx_path, src_lang):
     """
-    составить новый файл - сегментс + нужная транскрипция
 
-    не работает послк случая 
-    типа смотри в первом файле может быть так:
-    178 180
-    180 183
-
-    а во втором вот так:
-    178 183
     """
-
     for split in SPLITS:
         split_dir_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split
 
         txt_path = split_dir_path / "txt"
-        # segments_txt = txt_path / "segments.txt"
-        # transcript_txt = txt_path / "transcriptions.txt"
-
         segment_file = (
             mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments"
         )
 
         transcript_file = (
-            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "transcriptions.txt"
+            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "transcriptions"
         )
-
-        video_transcript_segments = defaultdict(list)
-
-        read_transcript_file = read_txt_file(transcript_file)
-        read_segment_file = read_txt_file(segment_file)
-        i = 0
-        # Открываем файлы для чтения
-        file = open(txt_path / 'segments_trans.txt', "w")
+        file = open(txt_path / 'segments_transcriptions', "w")
         with open(segment_file, 'r') as segments_file, open(transcript_file, 'r') as transcriptions_file:
             segments_lines = segments_file.readlines()
             transcriptions_lines = transcriptions_file.readlines()
@@ -220,7 +186,6 @@ def make_transcription_segments(mtedx_path, src_lang):
 
             for line in segments_lines:
                 parts = line.strip().split()
-                segment_id = parts[0]
                 start = int(float(parts[2]))
                 end = int(float(parts[3]))
 
@@ -233,10 +198,9 @@ def make_transcription_segments(mtedx_path, src_lang):
                         matched_text = interval_text
                         break
                     i += 1
-
-                # print(f"{line.strip()} - {matched_text.strip() if matched_text else 'Текст не найден'}")
                 if matched_text:
-                    file.write(f"{line.strip().split()[0]} {line.strip().split()[1]} {line.strip().split()[2]} {line.strip().split()[3]} {' '.join(matched_text.strip().split()[4:])}\n")
+                    file.write("{}\n".format(\
+                        f"{line.strip().split()[0]} {line.strip().split()[1]} {line.strip().split()[2]} {line.strip().split()[3]} {' '.join(matched_text.strip().split()[4:])}"))
                     
 
 def preprocess_video(mtedx_path, src_lang, dir_out):
@@ -246,12 +210,9 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
 
         составить новый файл - сегментс + нужная транскрипция
     """
-    # mean_face_metadata = load_meanface_metadata(metadata_path)
     for split in SPLITS:
-        # print(split)
         split_dir_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split
         video_segments = list(read_txt_file(split_dir_path / "txt" / "segments"))
-        # out_path = dir_out / src_lang / split / "video"
         out_path = dir_out / split / "video"
 
         out_txt_path = dir_out / split / "txt"
@@ -260,14 +221,14 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
         out_txt_path.mkdir(parents=True, exist_ok=True)
 
         try: 
-            read_txt_file(f'{dir_out}/{split}/{split}.txt')
-            common_file = open(f'{dir_out}/{split}/{split}.txt', "a")
+            read_txt_file(f'{dir_out}/{split}/{split}')
+            common_file = open(f'{dir_out}/{split}/{split}', "w")
         except: 
-            common_file = open(f'{dir_out}/{split}/{split}.txt', "a")
+            common_file = open(f'{dir_out}/{split}/{split}', "w")
 
         num_curr_video_segments = len(list(out_path.rglob("*.mp4")))
         if num_curr_video_segments == len(video_segments):
-            continue # skip if all video segments are already processed
+            continue
         if split == "train":
             print(
                 f"\nSegmenting `{src_lang}` videos files "
@@ -275,7 +236,7 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
             )
 
         segment_file = (
-            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments_trans.txt"
+            mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "txt" / "segments_transcriptions"
         )
         video_to_segments = defaultdict(list)
 
@@ -303,16 +264,14 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
 
         video_format = "mp4"
         in_video_dir_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / split / "video"
-
+        print(f'\n==============START PROCESSIND VIDEOS FROM {split} SPLIT==============\n')
         for video_id, video_segments in tqdm(video_to_segments.items()):
-            # check if video has been already processed:
             all_segments_are_processed = all(
                 (out_path / video_id / f"{seg['id']}.{video_format}").exists()
                 for seg in video_segments
             )
             if all_segments_are_processed:
                 continue
-            # prepare to process video file
             in_filepath = in_video_dir_path / f"{video_id}.{video_format}"
 
             if not in_filepath.exists():
@@ -328,26 +287,23 @@ def preprocess_video(mtedx_path, src_lang, dir_out):
             out_seg_path.mkdir(parents=True, exist_ok=True)
             out_seg_txt_path.mkdir(parents=True, exist_ok=True)
 
-            print(f'START PROCESSIND VIDEOS FROM {split} SPLIT....')
-            for i, item in enumerate(video_segments):
+            for item in video_segments:
                 start = str(datetime.timedelta(seconds=float(item['start'])))
                 end = str(datetime.timedelta(seconds=float(item['end'])))
-                txt_content = item['text'].upper().translate(str.maketrans('', '', string.punctuation))
+                txt_content = preprocess_line(item['text'])
                 file_out = out_seg_path / f"{item['id']}.{video_format}"
-                print(f"SEGMENTING {item['id']}")
+                # print(f"-------SEGMENTING {item['id']}-------")
                 (
                     ffmpeg
                     .input(str(in_filepath), ss=start, to=end)
                     .output(str(file_out))
-                    .run(quiet=False)
+                    .run(quiet=True)
                 )
                 with open(f"{out_seg_txt_path / item['id']}.txt", "w") as file:
-                    print(f"WRITING TRANSCRIPTION IN {item['id']}")
-                    file.write(f"{item['start']} {item['end']} {txt_content}")
-
-                if i != len(video_segments) - 1: common_file.write(f"{item['id']} {item['start']} {item['end']} {txt_content}\n")
-                else: common_file.write(f"{item['id']} {item['start']} {item['end']} {txt_content}")
-            print(f'ALL VIDEOS FROM {split} SPLIT PROCESSED !')
+                    # print(f"-------WRITING TRANSCRIPTION IN {item['id']}-------")
+                    file.write("{}".format(f"{item['start']} {item['end']} {txt_content}"))
+                common_file.write("{}\n".format(f"{item['id']} {item['start']} {item['end']} {txt_content}"))
+            # print(f'-------ALL VIDEOS FROM {split} SPLIT PROCESSED!-------')
 
 
 
@@ -358,9 +314,8 @@ def extract_tgz(tgz_filepath, extract_path, out_filename=None):
     tgz_object = tarfile.open(tgz_filepath)
     if not out_filename:
         out_filename = tgz_object.getnames()[0]
-    # check if file is already extracted
     if not (extract_path / out_filename).exists():
-        for mem in tqdm(tgz_object.getmembers(), desc=f"Extracting {tgz_filename}"):
+        for mem in tqdm(tgz_object.getmembers(), desc=f"\n-------Extracting {tgz_filename}-------\n"):
             out_filepath = extract_path / mem.get_info()["name"]
             if mem.isfile() and not out_filepath.exists():
                 tgz_object.extract(mem, path=extract_path)
@@ -369,7 +324,6 @@ def extract_tgz(tgz_filepath, extract_path, out_filename=None):
 
 def prepare_txt(mtedx_path, src_lang):
     corpus_path = mtedx_path / f"mtedx_{src_lang}" / f"{src_lang}-{src_lang}" / "data" / f"input_{src_lang}.txt"
-    # corpus_path = f"input_{src_lang}.txt"
 
     corpus_file = open(corpus_path, "w")
 
@@ -379,36 +333,17 @@ def prepare_txt(mtedx_path, src_lang):
         split_corpus_file = open(txt_path / f"{split}.{src_lang}")
         lines = split_corpus_file.readlines()
 
-        for i, line in enumerate(lines):
-            line = re.sub(r"[A-Za-z]+", "", line)
-            line = re.sub(r"\([^)]*\)\ *", "", line)
-            line = re.sub(r'^[^:]+:\s*', '', line)
-
+        for line in lines:
+            line = preprocess_line(line)
             if len(line) == 0:
                 continue
-            line = line.upper().translate(str.maketrans('', '', string.punctuation))
-            line = re.sub(r"»|«|—", "", line)
-            # line = replace_numbers_with_words(line)
-            line = re.sub(r'Ё', 'Е', line)
-            line = re.sub(r'ё', 'е', line)
-            line = re.sub(r'[^0-9а-яА-Я \n]', '', line)
-
             if line.strip() != "" and line.strip() != " ":
-                corpus_file.write(line)
-                # print(line)
-            
+                corpus_file.write("{}\n".format(line))
     corpus_file.close()
 
 
 if __name__ == '__main__':
-    # Argument Parsing
     parser = argparse.ArgumentParser(description="mTEDx Preprocessing")
-    parser.add_argument(
-        "--detector",
-        type=str,
-        default="retinaface",
-        help="Type of face detector. (Default: retinaface)",
-    )
     parser.add_argument(
         "--root-dir",
         type=str,
@@ -465,4 +400,4 @@ if __name__ == '__main__':
     preprocess_vtt_files(Path(downloaded_path), src_lang, seg_duration)
     make_transcription_segments(Path(downloaded_path), src_lang)
     preprocess_video(Path(downloaded_path), src_lang, Path(dst_vid_dir))
-    prepare_txt(Path(downloaded_path), src_lang)
+    # prepare_txt(Path(downloaded_path), src_lang)
