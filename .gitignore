@@ -170,3 +170,7 @@ test.py
 new_requirements.txt
 test.txt
 prepare_spm.py
+test_dir/
+test_data/
+data/
+spm/test_spm.py
