@@ -400,4 +400,3 @@ if __name__ == '__main__':
     preprocess_vtt_files(Path(downloaded_path), src_lang, seg_duration)
     make_transcription_segments(Path(downloaded_path), src_lang)
     preprocess_video(Path(downloaded_path), src_lang, Path(dst_vid_dir))
-    # prepare_txt(Path(downloaded_path), src_lang)
