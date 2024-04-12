@@ -18,6 +18,8 @@ from tqdm.contrib.concurrent import process_map
 # SPLITS = ['train', 'test', 'valid']
 # SPLITS = ['test', 'valid']
 SPLITS = ['train']
+# SPLITS = ['test', 'valid', 'train']
+
 
 
 def download_extract_file_if_not(url, tgz_filepath, download_filename):
@@ -71,10 +73,14 @@ def download_video_from_youtube(download_path: str, yt_id: str, only_video: bool
         downloaded = True
     else:
         url = f"https://www.youtube.com/watch?v={yt_id}"
-        yt = YouTube(url)
-        video = yt.streams.filter(only_video=only_video, res="1080p").first()
-        video.download(output_path=download_path, filename=yt_id + '.mp4')
-        downloaded = True
+        # print(yt_id)
+        try:
+            yt = YouTube(url)
+            video = yt.streams.filter(only_video=only_video).first()
+            video.download(output_path=download_path, filename=yt_id + '.mp4')
+            downloaded = True
+        except:
+            downloaded=False
     return downloaded
 
 
@@ -135,28 +141,45 @@ def download_mtedx_videos(args):
         not_found_videos = set()
     
     for split in SPLITS:
-        download_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "video"
+        # download_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "video"
+        download_path = args['mTedx'] / f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "video"
+
 
         download_path.mkdir(parents=True, exist_ok=True)
-
+        f"\n======Downloading {args['src_lang']}/{split} Videos======\n"
         if is_empty(download_path):
-            if split == "train":
-                print(f"\nDownloading {args['src_lang']} videos from YouTube")
-        
-            wav_dir_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
+            # wav_dir_path = args['mTedx'] / f"{args['dataset']}_{args['src_lang']}"/ f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
+            wav_dir_path = args['mTedx'] / f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
+
             
             yt_ids = [wav_filepath.stem for wav_filepath in wav_dir_path.glob("*")]
-            downloading_status = process_map(
-                partial(download_video_from_youtube, download_path),
-                yt_ids[0:1],
-                max_workers=os.cpu_count(),
-                desc=f"\n======Downloading {args['src_lang']}/{split} Videos======\n",
-                chunksize=1,
-            )
-            assert len(yt_ids) == len(downloading_status)
-            for yt_id, downloaded in zip(yt_ids, downloading_status):
-                if not downloaded:
-                    not_found_videos.add(yt_id)
+
+            # downloading_status = process_map(
+            downloading_status = []
+            
+            for yt_id in yt_ids:
+                downloading_status.append(download_video_from_youtube(download_path, yt_id))
+        else:
+            wav_dir_path = args['mTedx'] / f"{args['src_lang']}-{args['src_lang']}" / "data" / split / "wav"
+            yt_ids = [wav_filepath.stem for wav_filepath in wav_dir_path.glob("*")]
+            downloaded_ids = [video_filepath.stem for video_filepath in download_path.glob("*")]
+            yt_ids = list(set(yt_ids) - set(downloaded_ids))
+            downloading_status = []
+            for yt_id in yt_ids:
+                downloading_status.append(download_video_from_youtube(download_path, yt_id))
+                print(yt_id)
+            # download
+        
+            # partial(download_video_from_youtube, download_path),
+            # yt_ids,
+            # max_workers=os.cpu_count(),
+            # desc=f"\n======Downloading {args['src_lang']}/{split} Videos======\n",
+            # chunksize=1,
+        # )
+        assert len(yt_ids) == len(downloading_status)
+        for yt_id, downloaded in zip(yt_ids, downloading_status):
+            if not downloaded:
+                not_found_videos.add(yt_id)
     with open(args['mTedx'] / "not_found_videos.txt", "w") as fout:
         fout.writelines([f"{id_}\n" for id_ in not_found_videos])
 
