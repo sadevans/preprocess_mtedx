@@ -6,7 +6,7 @@ import torchvision
 
 def split_file(filename, max_frames=600, fps=25.0):
 
-    print('FILENAME: ', filename)
+    # print('FILENAME: ', filename)
     lines = open(filename).read().splitlines()
 
     flag = 0
@@ -19,7 +19,7 @@ def split_file(filename, max_frames=600, fps=25.0):
     threshold = max_frames / fps
 
     for line in lines:
-        print(line)
+        # print(line)
         if "WORD START END ASDSCORE" in line:
             flag = 1
             continue
@@ -43,7 +43,7 @@ def split_file(filename, max_frames=600, fps=25.0):
                 stack = [word]
     if stack:
         res.append([" ".join(stack), start_timestamp, end, end - start_timestamp])
-        print('RES IN SPLITTING: ', res)
+        # print('RES IN SPLITTING: ', res)
     return res
 
 
@@ -103,7 +103,7 @@ def save_vid_txt(
     content,
     video_fps=25):
     # -- save video
-    print(f'SAVING VIDEO {dst_vid_filename}....', )
+    # print(f'SAVING VIDEO {dst_vid_filename}....', )
     if dst_vid_filename is not None:
         save2vid(dst_vid_filename, trim_vid_data, video_fps)
     # -- save audio

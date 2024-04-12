@@ -1,6 +1,8 @@
 import argparse
 import math
 import os
+from os import path
+from pathlib import Path
 import pickle
 import warnings
 from data.data_module import AVSRDataLoader
@@ -13,7 +15,7 @@ import gc
 import string
 import re
 warnings.filterwarnings("ignore")
-
+    
 
 def preprocess_line(line):
     line = line.upper()
@@ -117,13 +119,31 @@ if __name__ == '__main__':
         else f"{dataset}_{args.subset}_transcript_lengths_seg{seg_duration}s.{args.groups}.{args.job_index}.csv",
     )
 
-    print('LABEL FILENAME: ', label_filename)
+    another_label_filename = os.path.join(
+        args.root_dir,
+        "labels",
+        f"{dataset}_{args.subset}_transcript_lengths_seg{seg_duration}s_online.csv"
+        if args.groups <= 1
+        else f"{dataset}_{args.subset}_transcript_lengths_seg{seg_duration}s_online.{args.groups}.{args.job_index}.csv",
+    )
+
+    # print('LABEL FILENAME: ', label_filename)
 
     os.makedirs(os.path.dirname(label_filename), exist_ok=True)
     print(f"Directory {os.path.dirname(label_filename)} created")
 
-    f = open(label_filename, "w")
-    flag_open = True
+    if path.exists(label_filename):
+        f = open(label_filename, 'a')
+    else:
+        f = open(label_filename, "w")
+
+    if path.exists(another_label_filename):
+        f2 = open(another_label_filename, 'a')
+    else:
+        f2 = open(another_label_filename, "w")
+    flag_open_labels = True
+    flag_open_labels2 = True
+
 
     # Step 2, extract mouth patches from segments.
     dst_vid_dir = os.path.join(
@@ -140,7 +160,7 @@ if __name__ == '__main__':
     # print('DST VID DIR: ', dst_vid_dir)
     # print('DST TXT DIR: ', dst_txt_dir)
 
-    print('COMMON FILE: ', os.path.join(args.data_dir, args.subset, args.subset))
+    # print('COMMON FILE: ', os.path.join(args.data_dir, args.subset, args.subset))
 
     if dataset.split('_')[0] == "mtedx":
         if args.subset in ["valid", "test"]:
@@ -157,7 +177,7 @@ if __name__ == '__main__':
             videos  = os.listdir(os.path.join(args.data_dir, args.subset, "video"))
             filenames = []
             for vid in videos:
-                print('\nVID:',vid)
+                # print('\nVID:',vid)
                 if vid == '.ipynb_checkpoints':
                     continue
                 else:
@@ -167,152 +187,146 @@ if __name__ == '__main__':
         else:
             raise NotImplementedError
         
+    filenames_processed = [os.path.join(args.data_dir, args.subset, "video", video_filepath[:-9], video_filepath) for video_filepath in os.listdir(os.path.join(args.root_dir, args.dataset, f"{args.dataset}_video_seg{args.seg_duration}s"))]
 
-    print('FILENAMES: ', filenames)
+    filenames = list(set(filenames) - set(filenames_processed))
+
+    # print('FILENAMES: ', filenames)
     print('LEN FILENAMES: ', len(filenames))
 
     unit = math.ceil(len(filenames) * 1.0 / args.groups)
     filenames = filenames[args.job_index * unit : (args.job_index + 1) * unit]
 
     # i = 0
-    for data_filename in tqdm(filenames[:1]):
-        print(os.path.normpath(data_filename).split(os.sep)[-4])
-        # i+=1
-        if args.landmarks_dir:
-            landmarks_filename = (
-                data_filename.replace(args.data_dir, args.landmarks_dir)[:-4] + ".pkl"
-            )
-            landmarks = pickle.load(open(landmarks_filename, "rb"))
-        else:
-            landmarks = None
-        try:
-            print('TRY TO HANDLE VID DATALOADER....')
-            video_data = vid_dataloader.load_data(data_filename, landmarks)
-        except (UnboundLocalError, TypeError, OverflowError, AssertionError):
-            print('here')
-            continue
+    for data_filename in tqdm(filenames):
+        # print(os.path.normpath(data_filename).split(os.sep)[-4])
 
-        print(os.path.normpath(data_filename).split(os.sep)[-4])
-    #     print(os.path.normpath(data_filename))
-        if os.path.normpath(data_filename).split(os.sep)[-4] in [
-            "train",
-            "test",
-            "valid",
-        ]:
-            print('DST VID DIR: ', dst_vid_dir)
-    #         print(data_filename.split('/'))
-    #         print(args.data_dir)
-            dst_vid_filename = os.path.join(dst_vid_dir, f"{data_filename.split('/')[-1]}")
+        dst_vid_filename = os.path.join(dst_vid_dir, f"{data_filename.split('/')[-1]}")
+        dst_txt_filename = os.path.join(dst_txt_dir, f"{data_filename.split('/')[-1].replace('mp4', 'txt')}")
 
-            dst_txt_filename = os.path.join(dst_txt_dir, f"{data_filename.split('/')[-1].replace('mp4', 'txt')}")
-            
-            trim_vid_data = video_data
+        if not path.exists(dst_vid_filename):
+            if args.landmarks_dir:
+                landmarks_filename = (
+                    data_filename.replace(args.data_dir, args.landmarks_dir)[:-4] + ".pkl"
+                )
+                landmarks = pickle.load(open(landmarks_filename, "rb"))
+            else:
+                landmarks = None
+            try:
+                video_data = vid_dataloader.load_data(data_filename, landmarks)
+            except (UnboundLocalError, TypeError, OverflowError, AssertionError):
+                # print('here')
+                continue
+
             txt_data_filename = data_filename[:-4].replace('video', 'txt')
             text_line_list = (
                 open(txt_data_filename + ".txt", "r", encoding="utf-8").read().splitlines()[0].split(" ")
             )
-            # print(text_line_list)
-            
-            # text_line = " ".join(text_line_list[2:])
-            # print(text_line)
-            
-            # content = text_line.replace("}", "").replace("{", "").replace(",", "").replace(".", "")
-            # text_line = text_line.replace('  ', ' ')
-            # text_line = text_line.replace('Ё', 'Е')
-            # text_line = text_line.replace('ё', 'е')
 
             content = preprocess_line(" ".join(text_line_list[2:]))
-            # content = text_line.upper().translate(str.maketrans('', '', string.punctuation))
-            print('CONTENT: ', content)
-            if trim_vid_data is None:
+            if video_data is None:
                 continue
-            video_length = len(trim_vid_data)
-            print('\nVIDEO LEN: ', video_length)
-            
-
-            if video_length == 0:
-                continue
-            elif video_length == args.seg_duration * fps:
-                continue
-            print('SAVING...')
-            save_vid_txt( 
-                dst_vid_filename,
-                dst_txt_filename,
-                trim_vid_data,
-                content,
-                video_fps=fps
-            )
-            # if i ==2: break
-            basename = os.path.relpath(
-                dst_vid_filename, start=os.path.join(args.root_dir, dataset)
-            )
-            token_id_str = " ".join(
-                map(str, [_.item() for _ in text_transform.tokenize(content)])
-            )
-            if not flag_open:
-                f = open(label_filename, "a")
-            else:
-                flag_open = False
-            f.write(
-                "{}\n".format(
-                    f"{dataset},{basename},{trim_vid_data.shape[0]},{token_id_str}"
+            video_length = len(video_data)
+            if video_length <= args.seg_duration * fps:
+                # print('SAVING...')
+                save_vid_txt( 
+                    dst_vid_filename,
+                    dst_txt_filename,
+                    video_data,
+                    content,
+                    video_fps=fps
                 )
-            )
-            f.close()
-            torch.cuda.empty_cache()
-            gc.collect()
-            continue
-
-        print('SPLITTING....')
-        break
-        txt_data_filename = data_filename[:-4].replace('video', 'txt')
-        splitted = split_file(txt_data_filename + ".txt", max_frames=seg_vid_len)
-        for i in range(len(splitted)):
-            if len(splitted) == 1:
-                content, start, end, duration = splitted[i]
-                trim_vid_data = video_data
-            else:
-                content, start, end, duration = splitted[i]
-                print('CONTENT: ', content)
-                start_idx, end_idx = int(start * 25), int(end * 25)
-                try:
-                    trim_vid_data = (
-                        video_data[start_idx:end_idx],
-                    )
-                except TypeError:
-                    continue
-            dst_vid_filename = os.path.join(dst_vid_dir, f"{data_filename.split('/')[-1]}")
-
-            dst_txt_filename = os.path.join(dst_txt_dir, f"{data_filename.split('/')[-1].replace('mp4', 'txt')}")
-
-            if trim_vid_data is None:
-                continue
-            video_length = len(trim_vid_data)
-            if video_length == 0:
-                continue
-            save_vid_txt(
-                dst_vid_filename,
-                dst_txt_filename,
-                trim_vid_data,
-                content,
-            )
-            basename = os.path.relpath(
-                dst_vid_filename, start=os.path.join(args.root_dir, dataset)
-            )
-            token_id_str = " ".join(
-                map(str, [_.item() for _ in text_transform.tokenize(content)])
-            )
-            if token_id_str:
-                if not flag_open:
+                # if i ==2: break
+                basename = os.path.relpath(
+                    dst_vid_filename, start=os.path.join(args.root_dir, dataset)
+                )
+                token_id_str = " ".join(
+                    map(str, [_.item() for _ in text_transform.tokenize(content)])
+                )
+                if not flag_open_labels:
                     f = open(label_filename, "a")
-                else:
-                    flag_open = False
+                    f2 = open(another_label_filename, "a")
+
+                    flag_open_labels = True
+                    flag_open_labels2 = True
+
+                
+                if flag_open_labels:
+                    f.write(
+                        "{}\n".format(
+                            f"{dataset},{basename},{video_data.shape[0]},{token_id_str}"
+                        )
+                    )
+                    f.close()
+                    flag_open_labels = False
+
+                if flag_open_labels2:
+                    f2.write(
+                        "{}\n".format(
+                            f"{dataset},{basename},{video_data.shape[0]},{len(content)}"
+                        )
+                    )
+                    f2.close()
+                    flag_open_labels2 = False
+                torch.cuda.empty_cache()
+                gc.collect()
+
+
+
+                # continue
+            # else:
+            #     continue
+
+        # print('SPLITTING....')
+        # break
+        # txt_data_filename = data_filename[:-4].replace('video', 'txt')
+        # splitted = split_file(txt_data_filename + ".txt", max_frames=seg_vid_len)
+        # for i in range(len(splitted)):
+        #     if len(splitted) == 1:
+        #         content, start, end, duration = splitted[i]
+        #         trim_vid_data = video_data
+        #     else:
+        #         content, start, end, duration = splitted[i]
+        #         print('CONTENT: ', content)
+        #         start_idx, end_idx = int(start * 25), int(end * 25)
+        #         try:
+        #             trim_vid_data = (
+        #                 video_data[start_idx:end_idx],
+        #             )
+        #         except TypeError:
+        #             continue
+        #     dst_vid_filename = os.path.join(dst_vid_dir, f"{data_filename.split('/')[-1]}")
+
+        #     dst_txt_filename = os.path.join(dst_txt_dir, f"{data_filename.split('/')[-1].replace('mp4', 'txt')}")
+
+        #     if trim_vid_data is None:
+        #         continue
+        #     video_length = len(trim_vid_data)
+        #     if video_length == 0:
+        #         continue
+        #     save_vid_txt(
+        #         dst_vid_filename,
+        #         dst_txt_filename,
+        #         trim_vid_data,
+        #         content,
+        #     )
+        #     basename = os.path.relpath(
+        #         dst_vid_filename, start=os.path.join(args.root_dir, dataset)
+        #     )
+        #     token_id_str = " ".join(
+        #         map(str, [_.item() for _ in text_transform.tokenize(content)])
+        #     )
+        #     if token_id_str:
+        #         if not flag_open_labels:
+        #             f = open(label_filename, "a")
+        #         else:
+        #             flag_open_labels = False
 
                     
-                f.write(
-                    "{}\n".format(
-                        f"{dataset},{basename},{trim_vid_data.shape[0]},{token_id_str}"
-                    )
-                )
-                f.close()
-                torch.cuda.empty_cache()
+        #         f.write(
+        #             "{}\n".format(
+        #                 f"{dataset},{basename},{trim_vid_data.shape[0]},{token_id_str}"
+        #             )
+        #         )
+        #         f.close()
+        #         torch.cuda.empty_cache()

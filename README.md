@@ -18,3 +18,6 @@ python3 download.py --dataset mtedx --root-path your/path/to/download/folder --s
 
 
 # Шаг 2. Предобработка датасета для обрезки видео
+```bash
+python3 download.py --dataset mtedx --root-path your/path/to/download/folder --src-lang ru
+```
