@@ -18,6 +18,7 @@ python3 download.py --dataset mtedx --root-path your/path/to/download/folder --s
 
 
 # Шаг 2. Предобработка датасета для обрезки видео
+python prepare_mtedx.py --root-dir "/media/sadevans/T7/ЛИЧНОЕ/Diplom/datsets/mTedx/ru-ru/preproc" --dataset "mtedx_ru" --downloaded-path "/media/sadevans/T7/ЛИЧНОЕ/Diplom/datsets/mTedx" --seg-duration 24 --src-lang "ru"
 
 # Шаг 3. Обрезка ROI губ
 

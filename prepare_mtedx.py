@@ -18,8 +18,8 @@ import string
 
 
 # SPLITS = ['train', 'test', 'valid']
-# SPLITS = ['test', 'valid']
-SPLITS = ['train']
+SPLITS = ['valid', 'test']
+# SPLITS = ['train']
 
 def time_to_seconds(time_str):
     """

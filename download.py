@@ -191,7 +191,7 @@ def prepare_mtedx(args):
         download_mtedx_data(args["mTedx"], args["src_lang"], args["src_lang"])
 
     # download mtedx videos from youtube
-    download_mtedx_videos(args)
+    # download_mtedx_videos(args)
 
     
 
