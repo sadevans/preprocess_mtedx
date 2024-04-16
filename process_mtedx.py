@@ -4,21 +4,28 @@ import json
 import torch
 import torchaudio
 import torchvision
+import torchvision.io
 from tqdm import tqdm
 from joblib import Parallel, delayed
 import re
+import ffmpeg
+
+from moviepy.editor import VideoFileClip
 
 
 
 def preprocess_text(line):
     # line = line.upper()
-    line = line.lower()
-    line = re.sub(r'\([^(){}\[\]]*\)', '', line)
-    line = line.replace('Ё', 'Е')
-    line = line.replace('ё', 'е')
-    line = re.sub(r'[^0-9а-яА-Я- ]', '', line)
-    line = line.replace('\t', '')
-    line = re.sub(r'\s{2,}', ' ', line)
+    if '(Видео)' in line:
+        line = None
+    else:
+        line = line.lower()
+        line = re.sub(r'\([^(){}\[\]]*\)', '', line)
+        line = line.replace('Ё', 'Е')
+        line = line.replace('ё', 'е')
+        line = re.sub(r'[^0-9а-яА-Я- ]', '', line)
+        line = line.replace('\t', '')
+        line = re.sub(r'\s{2,}', ' ', line)
 
     return line
 
@@ -53,6 +60,7 @@ def load_video_text_data(data_folder, lang, group):
         f"Data mismatch with language: {lang}, group: {group}"
     
     print(video_samples)
+    print('printed video samples')
     return video_samples, text_samples
 
 
@@ -81,11 +89,25 @@ def split_and_save_video(input_path, output_path, start_time, end_time,
         The output fps of the output video segment (default: 25).
     """
     # read the video file
-    video_frames, _, metadata = torchvision.io.read_video(input_path, start_pts=start_time, end_pts=end_time)
+    # video_frames, _, metadata = torchvision.io.read_video(input_path, start_pts=start_time, end_pts=end_time)
 
-    print(len(video_frames))
-    print(int(end_time - start_time)*input_fps)
-    torchvision.io.write_video(output_path, video_frames, fps=out_fps, video_codec='libx264')
+    try:
+        print('in try')
+        (
+        ffmpeg
+        .input(str(input_path), ss=start_time, to=end_time)
+        .output(str(output_path), vf=f'fps={OUT_FPS}')
+        .run(quiet=True)
+        )
+        success = True
+    except ffmpeg.Error as e:
+        print('An error occurred:', e.stderr)
+        success = False
+
+    return success
+    # print(len(video_frames))
+    # print(int(end_time - start_time)*input_fps)
+    # torchvision.io.write_video(output_path, video_frames, fps=out_fps, video_codec='libx264')
 
 
 def process_video_text_sample(i, video, text, data_folder, save_folder,
@@ -115,7 +137,7 @@ def process_video_text_sample(i, video, text, data_folder, save_folder,
 
     text = preprocess_text(text)
 
-    if len(text) == 0:
+    if len(text) == 0 or text is None:
         return None
     
     video_input_filepath = (
@@ -126,17 +148,21 @@ def process_video_text_sample(i, video, text, data_folder, save_folder,
         f"{save_folder}/{lang}/{group}/{video_segment_filename}.mp4"
     )
     # save audio file
-    _, _ , info = torchvision.io.read_video(video_input_filepath)
-    split_and_save_video(
+    print('get info')
+    # _, _ , info = torchvision.io.read_video(video_input_filepath)
+    success = split_and_save_video(
         video_input_filepath,
         video_output_filepath,
         video["offset"],
         video["offset"]+video["duration"],
-        info.video_fps,
+        # info.video_fps,
+        25,
         OUT_FPS
     )
     # ruturn a line
-    return f"{video_segment_filename} {video['offset']} {video['offset']+video['duration']} {text}"
+    if success:
+        return f"{video_segment_filename} {video['offset']} {video['offset']+video['duration']} {text}"
+    return None
 
 
 
@@ -172,7 +198,13 @@ def preprocess(data_folder, save_folder, lang, group):
     print(f"Creating group file in {group_file} for {lang}, group: {group}.txt")
     video_samples, text_samples = load_video_text_data(data_folder, lang, group)
     # combine text & video information
-    result = Parallel(n_jobs=2, backend="threading")(
+    # with open(group_file, 'w', encoding='utf8') as fout:
+    #         for i, (video, text,) in tqdm(enumerate(zip(video_samples, text_samples))):
+    #             line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group)
+    #             if line is not None:
+    #                 fout.write("{}\n".format(line))
+
+    result = Parallel(n_jobs=4, backend="threading")(
         delayed(process_video_text_sample)
         (i, video, text, data_folder, save_folder, lang, group) \
         for i, (video, text,) in tqdm(
