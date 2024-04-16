@@ -4,19 +4,21 @@ import json
 import torch
 import torchaudio
 import torchvision
-import torchvision.io
 from tqdm import tqdm
 from joblib import Parallel, delayed
 import re
 import ffmpeg
 
-from moviepy.editor import VideoFileClip
 
 
 
 def preprocess_text(line):
     # line = line.upper()
-    if '(Видео)' in line:
+    if '(Видео)' in line or '(видео)' in line:
+        line = None
+    elif bool(re.search(r'[a-zA-Z]', line)):
+        line = None
+    elif line.startswith('['):
         line = None
     else:
         line = line.lower()
@@ -26,6 +28,8 @@ def preprocess_text(line):
         line = re.sub(r'[^0-9а-яА-Я- ]', '', line)
         line = line.replace('\t', '')
         line = re.sub(r'\s{2,}', ' ', line)
+    if line is None or len(line) == 0:
+        line = None
 
     return line
 
@@ -58,9 +62,6 @@ def load_video_text_data(data_folder, lang, group):
     # sanity check
     assert len(text_samples) == len(video_samples), \
         f"Data mismatch with language: {lang}, group: {group}"
-    
-    print(video_samples)
-    print('printed video samples')
     return video_samples, text_samples
 
 
@@ -92,7 +93,6 @@ def split_and_save_video(input_path, output_path, start_time, end_time,
     # video_frames, _, metadata = torchvision.io.read_video(input_path, start_pts=start_time, end_pts=end_time)
 
     try:
-        print('in try')
         (
         ffmpeg
         .input(str(input_path), ss=start_time, to=end_time)
@@ -137,7 +137,9 @@ def process_video_text_sample(i, video, text, data_folder, save_folder,
 
     text = preprocess_text(text)
 
-    if len(text) == 0 or text is None:
+    # if len(text) == 0 or text is None:
+    #     return None
+    if text is None:
         return None
     
     video_input_filepath = (
@@ -148,7 +150,6 @@ def process_video_text_sample(i, video, text, data_folder, save_folder,
         f"{save_folder}/{lang}/{group}/{video_segment_filename}.mp4"
     )
     # save audio file
-    print('get info')
     # _, _ , info = torchvision.io.read_video(video_input_filepath)
     success = split_and_save_video(
         video_input_filepath,
@@ -198,27 +199,27 @@ def preprocess(data_folder, save_folder, lang, group):
     print(f"Creating group file in {group_file} for {lang}, group: {group}.txt")
     video_samples, text_samples = load_video_text_data(data_folder, lang, group)
     # combine text & video information
-    # with open(group_file, 'w', encoding='utf8') as fout:
-    #         for i, (video, text,) in tqdm(enumerate(zip(video_samples, text_samples))):
-    #             line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group)
-    #             if line is not None:
-    #                 fout.write("{}\n".format(line))
-
-    result = Parallel(n_jobs=4, backend="threading")(
-        delayed(process_video_text_sample)
-        (i, video, text, data_folder, save_folder, lang, group) \
-        for i, (video, text,) in tqdm(
-            enumerate(zip(video_samples, text_samples)),
-            desc=f"Processing {lang}, {group}",
-            total = len(video_samples)
-        )
-    )
-    
-    # write line into group file   
     with open(group_file, 'w', encoding='utf8') as fout:
-        for line in result:
-            if line is not None:
-                fout.write("{}\n".format(line))
+            for i, (video, text,) in tqdm(enumerate(zip(video_samples, text_samples))):
+                line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group)
+                if line is not None:
+                    fout.write("{}\n".format(line))
+
+    # result = Parallel(n_jobs=3, backend="threading")(
+    #     delayed(process_video_text_sample)
+    #     (i, video, text, data_folder, save_folder, lang, group) \
+    #     for i, (video, text,) in tqdm(
+    #         enumerate(zip(video_samples, text_samples)),
+    #         desc=f"Processing {lang}, {group}",
+    #         total = len(video_samples)
+    #     )
+    # )
+    
+    # # write line into group file   
+    # with open(group_file, 'w', encoding='utf8') as fout:
+    #     for line in result:
+    #         if line is not None:
+    #             fout.write("{}\n".format(line))
     print(f"{group_file} successfully created!")
 
 
