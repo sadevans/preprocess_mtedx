@@ -8,8 +8,13 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 import re
 import ffmpeg
+from moviepy.editor import VideoFileClip
+from preparation.detectors.retinaface.detector import LandmarksDetector
 
 
+def milliseconds_to_seconds(milliseconds):
+    seconds = milliseconds / 1000
+    return seconds
 
 
 def preprocess_text(line):
@@ -65,8 +70,7 @@ def load_video_text_data(data_folder, lang, group):
     return video_samples, text_samples
 
 
-def split_and_save_video(input_path, output_path, start_time, end_time,
-        input_fps, out_fps=25):
+def split_and_save_video(input_path, output_path, start_time, end_time, landmarks_detector, input_fps, out_fps=25):
     """
     Splits the given video file into a segment based on the specified
     `start_time` & `end_time`. Then, it saves the videosegment in a mono wav
@@ -92,26 +96,44 @@ def split_and_save_video(input_path, output_path, start_time, end_time,
     # read the video file
     # video_frames, _, metadata = torchvision.io.read_video(input_path, start_pts=start_time, end_pts=end_time)
 
-    try:
-        (
-        ffmpeg
-        .input(str(input_path), ss=start_time, to=end_time)
-        .output(str(output_path), vf=f'fps={OUT_FPS}')
-        .run(quiet=True)
-        )
-        success = True
-    except ffmpeg.Error as e:
-        print('An error occurred:', e.stderr)
-        success = False
+    # check faces
+    video = VideoFileClip(str(input_path))
+    start_time = milliseconds_to_seconds(start_time)
+    end_time = milliseconds_to_seconds(end_time)
+    segment = video.subclip(start_time, end_time)
+    segment.show()
+    # print(segment.iter_frames())
+    # success = False
+    # landmarks_detector.fac
 
-    return success
+    for frame in segment.iter_frames():
+        detected_faces = landmarks_detector.face_detector(frame, rgb=False)
+        print(detected_faces)
+        if len(detected_faces) == 0:
+            return False
+    
+    segment.write_videofile(str(output_path), fps=OUT_FPS)
+    # success = True
+    
+    # try:
+    #     (
+    #     ffmpeg
+    #     .input(str(input_path), ss=start_time, to=end_time)
+    #     .output(str(output_path), vf=f'fps={OUT_FPS}')
+    #     .run(quiet=True)
+    #     )
+    #     success = True
+    # except ffmpeg.Error as e:
+    #     print('An error occurred:', e.stderr)
+    #     success = False
+
+    return True
     # print(len(video_frames))
     # print(int(end_time - start_time)*input_fps)
     # torchvision.io.write_video(output_path, video_frames, fps=out_fps, video_codec='libx264')
 
 
-def process_video_text_sample(i, video, text, data_folder, save_folder,
-        lang, group):
+def process_video_text_sample(i, video, text, data_folder, save_folder, lang, group, landmarks_detector):
     """
     Process one data sample.
 
@@ -156,9 +178,10 @@ def process_video_text_sample(i, video, text, data_folder, save_folder,
         video_output_filepath,
         video["offset"],
         video["offset"]+video["duration"],
+        landmarks_detector,
         # info.video_fps,
         25,
-        OUT_FPS
+        OUT_FPS      
     )
     # ruturn a line
     if success:
@@ -199,9 +222,11 @@ def preprocess(data_folder, save_folder, lang, group):
     print(f"Creating group file in {group_file} for {lang}, group: {group}.txt")
     video_samples, text_samples = load_video_text_data(data_folder, lang, group)
     # combine text & video information
+    landmarks_detector = LandmarksDetector()
+
     with open(group_file, 'w', encoding='utf8') as fout:
             for i, (video, text,) in tqdm(enumerate(zip(video_samples, text_samples))):
-                line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group)
+                line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group, landmarks_detector)
                 if line is not None:
                     fout.write("{}\n".format(line))
 
