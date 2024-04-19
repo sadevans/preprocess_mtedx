@@ -44,4 +44,4 @@ python parse_data.py --root-dir "path/to/your/future/data" --dataset "name of yo
 - ``--query``  - Опциональный аргумент. Если парсите видео по запросу - введите запрос.
 - ``--src-lang`` - Язык ваших данных, `default` = "ru".
 - ``--count`` - Количество видео, которое хотите спарсить, `default` = 50.
-- ``if-parse`` - Нужно ли парсить видео или же сразу перейти к их загрузке, `default` = False.
+- ``--if-parse`` - Нужно ли парсить видео или же сразу перейти к их загрузке, `default` = False.
