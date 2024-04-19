@@ -19,8 +19,7 @@ warnings.filterwarnings("ignore")
 
 def preprocess_line(line):
     line = line.upper()
-    line = re.sub(r'^[^:]+:\s*', '', line)
-    line = re.sub(r'\([^)]*\)', '', line)
+    line = re.sub(r'\([^(){}\[\]]*\)', '', line)
     line = line.replace('Ё', 'Е')
     line = line.replace('ё', 'е')
     line = re.sub(r'[^0-9а-яА-Я- ]', '', line)
@@ -227,7 +226,7 @@ if __name__ == '__main__':
             if video_data is None:
                 continue
             video_length = len(video_data)
-            if video_length <= args.seg_duration * fps:
+            if video_length <= args.seg_duration * fps and video_length >= fps:
                 # print('SAVING...')
                 save_vid_txt( 
                     dst_vid_filename,
