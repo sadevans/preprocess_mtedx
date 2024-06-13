@@ -103,7 +103,7 @@ def save_vid_txt(
     content,
     video_fps=25):
     # -- save video
-    # print(f'SAVING VIDEO {dst_vid_filename}....', )
+    print(f'SAVING VIDEO {dst_vid_filename}....', )
     if dst_vid_filename is not None:
         save2vid(dst_vid_filename, trim_vid_data, video_fps)
     # -- save audio

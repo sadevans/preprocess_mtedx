@@ -100,19 +100,23 @@ def split_and_save_video(input_path, output_path, start_time, end_time, landmark
     video = VideoFileClip(str(input_path))
     start_time = milliseconds_to_seconds(start_time)
     end_time = milliseconds_to_seconds(end_time)
-    segment = video.subclip(start_time, end_time)
-    segment.show()
-    # print(segment.iter_frames())
-    # success = False
-    # landmarks_detector.fac
+    try:
+        segment = video.subclip(start_time, end_time)
+        # segment.show()
+        # print(segment.iter_frames())
+        # success = False
+        # landmarks_detector.fac
 
-    for frame in segment.iter_frames():
-        detected_faces = landmarks_detector.face_detector(frame, rgb=False)
-        print(detected_faces)
-        if len(detected_faces) == 0:
-            return False
-    
-    segment.write_videofile(str(output_path), fps=OUT_FPS)
+        # for frame in segment.iter_frames():
+        #     detected_faces = landmarks_detector.face_detector(frame, rgb=False)
+        #     # print(detected_faces)
+        #     if len(detected_faces) == 0:
+        #         return False
+        
+        segment.write_videofile(str(output_path), fps=OUT_FPS, verbose=True)
+        return True
+    except:
+        return False
     # success = True
     
     # try:
@@ -127,7 +131,8 @@ def split_and_save_video(input_path, output_path, start_time, end_time, landmark
     #     print('An error occurred:', e.stderr)
     #     success = False
 
-    return True
+    # return True
+
     # print(len(video_frames))
     # print(int(end_time - start_time)*input_fps)
     # torchvision.io.write_video(output_path, video_frames, fps=out_fps, video_codec='libx264')
@@ -171,6 +176,8 @@ def process_video_text_sample(i, video, text, data_folder, save_folder, lang, gr
     video_output_filepath = (
         f"{save_folder}/{lang}/{group}/{video_segment_filename}.mp4"
     )
+    if os.path.exists(video_output_filepath) or not os.path.exists(video_input_filepath):
+        return None
     # save audio file
     # _, _ , info = torchvision.io.read_video(video_input_filepath)
     success = split_and_save_video(
@@ -215,20 +222,21 @@ def preprocess(data_folder, save_folder, lang, group):
     group_file = os.path.join(lang_folder, f"{group}.txt")
 
     # skip if the file already exists
-    if os.path.exists(group_file):
-        print(f"{group_file} already exists. Skipping!!")
-        return
+    # if os.path.exists(group_file):
+    #     print(f"{group_file} already exists. Skipping!!")
+    #     return
     
     print(f"Creating group file in {group_file} for {lang}, group: {group}.txt")
     video_samples, text_samples = load_video_text_data(data_folder, lang, group)
     # combine text & video information
     landmarks_detector = LandmarksDetector()
 
-    with open(group_file, 'w', encoding='utf8') as fout:
-            for i, (video, text,) in tqdm(enumerate(zip(video_samples, text_samples))):
-                line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group, landmarks_detector)
-                if line is not None:
-                    fout.write("{}\n".format(line))
+    # with open(group_file, 'w', encoding='utf8') as fout:
+    for i, (video, text,) in tqdm(enumerate(zip(video_samples, text_samples))):
+        line = process_video_text_sample(i, video, text, data_folder, save_folder, lang, group, landmarks_detector)
+        if line is not None:
+            with open(group_file, 'a', encoding='utf8') as fout:
+                fout.write("{}\n".format(line))
 
     # result = Parallel(n_jobs=3, backend="threading")(
     #     delayed(process_video_text_sample)
